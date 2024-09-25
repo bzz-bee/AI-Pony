@@ -4,14 +4,16 @@ import soundfile as sf
 import wave
 import cookies
 import logging
-import os
 import random
 import requests
-import openai
 import aiohttp
 import asyncio
 import uuid
-
+import os
+from openai import OpenAI
+client = OpenAI(
+    api_key = os.environ.get("OPENAI_API_KEY"),
+)
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
@@ -246,13 +248,13 @@ def run():
         futures = []
         with ThreadPoolExecutor() as executor:
             for line in script:
-                if line.split(":")[0] in Voice_Models.keys():
-                    voice_id = Voice_Models[line.split(":")[0]].strip()
+                if line.split(":")[0] in tokens.keys():
+                    voice_id = tokens[line.split(":")[0]].strip()
                     text = line.split(":")[1].strip()
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
 
-                    futures.append(executor.submit(gen_voice, text, voice_id, pos))
+                    futures.append(executor.submit(speaker, text, voice_id, pos))
 
         wait(futures)
 
