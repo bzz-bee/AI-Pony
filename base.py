@@ -1,46 +1,22 @@
-# Standard imports
+from concurrent.futures import ThreadPoolExecutor, wait
+from time import sleep
+import soundfile as sf
+import wave
+import cookies
 import logging
 import os
 import random
-import time
-from concurrent.futures import ThreadPoolExecutor, wait
-from time import sleep
 import requests
-
-# Third-party imports
 import openai
-import soundfile as sf
-import wave
-
-# Other Imports
-import secret
+import aiohttp
+import asyncio
+import uuid
 
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
-#Setting up the API keys
-try:
-    uberduck_auth = secret.uberduck_auth
-except Exception as e:
-    logging.error(f"Uberduck Key not Found: {e}")
-    quit()
-
-try:
-    openai.api_key = secret.token
-except Exception as e:
-    logging.error(f"OpenAI Key not Found: {e}")
-    quit()
-
-#Setting up the Voice Models
-Voice_Models = {
-    "Spongebob": "2231cbd3-15a5-4571-9299-b58f36062c45",
-    "Patrick": "3b2755d1-11e2-4112-b75b-01c47560fb9c",
-    "Homer": "f8c7d125-a240-47e3-94be-18bb58179a2a",
-    "Bart": "c924eb5e-d5b1-4916-96ea-ac6948cdbe86"
-}
-
-#Setting up the base promt
-base_promt = """
+#Set up the base prompt
+base_prompt = """
     You are to create scripts. 
     You will be giving the topic and who to act like. 
     Make sure you are in character.
@@ -52,17 +28,14 @@ base_promt = """
     Keep everything dumb and stupid.
 """
 
-#Setting up the topics
+#Set up the topics
 prompts = [
-    "Spongebob, Patrick, Spongebob says undertale is gay",
-    "Spongebob, Patrick, Talking about having a massive orgy",
-    "Spongebob, Patrick, Talking about the heat deth of the universe",
-    "Spongebob, Patrick, Secret Krabby patty ingredient is Monosodium glutamate also known as E621",
-    "Spongebob, Patrick, Spongebob is a furry",
-    "Spongebob, Patrick, Spongebob is a brony",
-    "Spongebob, Patrick, Spongebob is a weeb",
-    "Spongebob, Patrick, Spongebob hates black lives matters and Patrick says the world will end in October 2nd 2025",
+    "Rainbow Dash, Applejack, Rainbow Dash says Undertale is gay",
+    "Rainbow Dash, Applejack, Applejack says she hates apples",
+    "Rainbow Dash, Applejack, Applejack and Rainbow Dash are fighting over which Linux distro is best",
+    "Rainbow Dash, Applejack, Rainbow Dash says she loves Applejack",
 ]
+
 
 #Creates the script using the OpenAI API
 def chat_gen(script, content):
@@ -92,59 +65,105 @@ def chat_gen(script, content):
         return None
 
 
-#Creates the voice using the Uberduck API
-def gen_voice(text, voice, pos):
+#set up voices (voices.py)
+
+tokens = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
+          "Applejack": "weight_a24e7sx6qgqpwamjsff3b3vef",
+          "Twilight Sparkle": "",
+          "Pinkie Pie": "weight_xzdr5a4cqhakdkshc96r32nv3",
+          "Rarity": "weight_4j661zfzd3wm7sh3ks7eghx3w",
+          "Fluttershy":"weight_25rdhte22qb0n6xtzk0h6s4xj",
+          "Spike":"weight_p0t7d8tqk35v6q8a50n5d2vke"}
+
+headers = {
+    "content-type": "application/json",
+    "credentials": "include",
+    "cookie": f"session=eyJhbGciOiJIUzI1NiJ9.eyJzZXNzaW9uX3Rva2VuIjoic2Vzc2lvbl8xMDM5ODQ1azkweXpjcjF6c3ZiMDVjNzIiLCJ1c2VyX3Rva2VuIjoidXNlcl9lODk4N3prMGNqN2QzIiwidmVyc2lvbiI6IjMifQ.IjjKTj1Qv3RTRSgyVqHP5ktyHzIgrTw0S6AUcgcjBTo"
+}
+
+
+def get_models_list(path: str = "./"):
+    """Request for a list of models and save it in path/models_list.txt"""
     try:
-        #Creates the request to the API
-        logging.info("Voice Request Started")
-        
-        for _ in range(10):  # Allow up to 10 attempts
-            response = requests.post(
-                "https://api.uberduck.ai/speak",
-                json=dict(speech=text, voicemodel_uuid=voice),
-                auth=uberduck_auth,
-            )
+        response = requests.get("https://api.fakeyou.com/tts/list")
+        response.raise_for_status()
+        with open(os.path.join(path, "models_list.txt"), "w") as file:
+            file.write(str(response.content))
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed: {e}")
 
-            response_json = response.json()
 
-            if 'detail' in response_json:  # Rate limit exceeded
-                logging.warning("Rate limit exceeded. Sleeping for 5 seconds before retrying...")
-                time.sleep(5)  # Wait for rate limit reset
-                continue
-            
-            if 'uuid' in response_json:
-                logging.info("Voice Request Finished")
-                audio_uuid = response_json["uuid"]
-                break
+async def make_tts_request(session, character: str, phrase: str) -> str:
+    """Asynchronous request for speech synthesis."""
+    try:
+        print("Making request...")
+        async with session.post(
+            url="https://api.fakeyou.com/tts/inference",
+            json={
+                "tts_model_token": tokens.get(character.lower()),
+                "uuid_idempotency_token": str(uuid.uuid4()),
+                "inference_text": phrase
+            },
+            headers=headers
+        ) as response:
+            response.raise_for_status()
+            job_token = (await response.json()).get("inference_job_token")
+            if job_token:
+                print(f"Job token: {job_token}")
+                return job_token
             else:
-                logging.error("Voice Request Failed: UUID not found in response")
-                logging.debug(f"Voice Request Failed: {response_json}")
-                return None, None
-        else:
-            logging.error("Voice Request Failed after 10 attempts due to rate limiting.")
-            return None, None
+                print("Error: No job token in response.")
+    except aiohttp.ClientError as e:
+        print(f"Request failed: {e}")
+    return None
 
-        #Checks the status of the request and downloads the audio file
-        logging.info("Voice Download Started")
-        for t in range(50):
-            sleep(1)
-            output = requests.get(
-                "https://api.uberduck.ai/speak-status",
-                params=dict(uuid=audio_uuid),
-                auth=uberduck_auth,
-            ).json()
-            if output['path'] != None:
-                r = requests.get(output["path"], allow_redirects=True)
-                file_path = f"speech{pos}.wav"
-                with open(file_path, "wb") as f:
-                    f.write(r.content)
-                return pos, file_path
-        logging.error("Voice Download Failed: Unable to download audio after 50 attempts")
-    except Exception as e:
-        logging.error(f"Error occurred in gen_voice: {e}")
-        return None, None
-    finally:
-        logging.info("Voice Download Finished")
+
+async def poll_tts_status(session, inference_job_token: str, delay: float = 2, max_attempts: int = 50) -> str:
+    """Asynchronous survey of the status of a request for speech synthesis and obtaining a link to an audio file."""
+    try:
+        print("Polling request...")
+        base_url = "https://storage.googleapis.com/vocodes-public"
+        attempts = 0
+        while attempts < max_attempts:
+            await asyncio.sleep(delay)
+            attempts += 1
+            async with session.get(f"https://api.fakeyou.com/tts/job/{inference_job_token}", headers=headers) as response:
+                response.raise_for_status()
+                json_response = await response.json()
+                print(f"Polling attempt: {attempts}")
+                if json_response["state"]["maybe_public_bucket_wav_audio_path"]:
+                    audio_path = base_url + json_response["state"]["maybe_public_bucket_wav_audio_path"]
+                    print(f"Audio file ready: {audio_path}")
+                    return audio_path
+                print("Pending...")
+        print("Error: max attempts reached")
+    except aiohttp.ClientError as e:
+        print(f"Polling failed: {e}")
+    return None
+
+
+async def download_audio(session, url: str, output_path: str):
+    """Asynchronous download of an audio file by url"""
+    try:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            with open(output_path, "wb") as f:
+                f.write(await response.read())
+            print(f"Saved audio file to: {output_path}")
+    except aiohttp.ClientError as e:
+        print(f"Download failed: {e}")
+
+
+async def fetch_and_save_audio(session, character: str, phrase: str, output_path: str, filename: str):
+    """Asynchronous receipt and downloading of a file"""
+    job_token = await make_tts_request(session, character, phrase)
+    if job_token:
+        audio_url = await poll_tts_status(session, job_token)
+        if audio_url:
+            output_path_audio = os.path.join(output_path, filename)
+            await download_audio(session, audio_url, output_path_audio)
+
+
 
 #Creates the script file
 def create_script(text, speaker, pos):
@@ -218,7 +237,7 @@ def run():
 
         #Chooses a random topic and creates the script
         rand_prompt = random.choice(prompts)
-        script = chat_gen(base_promt,rand_prompt)
+        script = chat_gen(base_prompt,rand_prompt)
 
         if script is None:
             logging.error("Script generation failed")
