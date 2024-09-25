@@ -1,13 +1,12 @@
 from flask import Flask, send_file
-import base
+import voices
 import os
-import base
 app = Flask(__name__)
 
-base.cleanup()
+voices.cleanup()
 @app.route("/audio", methods=["GET"])
 def audio():
-    base.run()
+    voices.run()
     if os.path.exists("output.wav"):
         return send_file("output.wav")
     else:
