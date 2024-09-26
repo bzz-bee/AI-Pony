@@ -10,62 +10,15 @@ import aiohttp
 import asyncio
 import uuid
 import os
+import json
 from openai import OpenAI
+from openai import Client
 client = OpenAI(
-    api_key = os.environ.get("OPENAI_API_KEY"),
+api_key = ""
 )
+
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
-
-#Set up the base prompt
-base_prompt = """
-    You are to create scripts. 
-    You will be giving the topic and who to act like. 
-    Make sure you are in character.
-    You are the act like the person you are given. 
-    You dont need actions just what they say.
-    Dont do any actions.
-    Make sure the script is over 10 lines long, but under 15.
-    Format is: person: "what they say" 
-    Keep everything dumb and stupid.
-"""
-
-#Set up the topics
-prompts = [
-    "Rainbow Dash, Applejack, Rainbow Dash says Undertale is gay",
-    "Rainbow Dash, Applejack, Applejack says she hates apples",
-    "Rainbow Dash, Applejack, Applejack and Rainbow Dash are fighting over which Linux distro is best",
-    "Rainbow Dash, Applejack, Rainbow Dash says she loves Applejack",
-]
-
-
-#Creates the script using the OpenAI API
-def chat_gen(script, content):
-    try:
-        logging.info("Script Generation Started")
-        reply = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": script},
-                {"role": "user", "content": content},
-            ]
-        )
-
-        # Cleanup of the response 
-        if 'choices' not in reply:
-            logging.error("Script Generation Failed: 'choices' not in reply")
-            return None
-
-        response = reply['choices'][0]['message']['content'] # type: ignore
-        response = response.replace("\n\n","\n")
-        response = response.split("\n")
-        logging.info("Script Generation Finished")
-
-        return response
-    except Exception as e:
-        logging.error(f"Error occurred in chat_gen: {e}")
-        return None
-
 
 #set up voices (voices.py)
 
@@ -166,6 +119,54 @@ async def fetch_and_save_audio(session, character: str, phrase: str, output_path
             await download_audio(session, audio_url, output_path_audio)
 
 
+#Set up the base prompt
+base_prompt = """
+    You are to create scripts. 
+    You will be giving the topic and who to act like. 
+    Make sure you are in character.
+    You are the act like the person you are given. 
+    You dont need actions just what they say.
+    Dont do any actions.
+    Make sure the script is over 10 lines long, but under 15.
+    Format is: person: "what they say" 
+    Keep everything dumb and stupid.
+"""
+
+#Set up the topics
+prompts = [
+    "Rainbow Dash, Applejack, Rainbow Dash says Undertale is gay",
+    "Rainbow Dash, Applejack, Applejack says she hates apples",
+    "Rainbow Dash, Applejack, Applejack and Rainbow Dash are fighting over which Linux distro is best",
+    "Rainbow Dash, Applejack, Rainbow Dash says she loves Applejack",
+]
+
+#Creates the script using the OpenAI API
+def chat_gen(script, content):
+    try:
+        logging.info("Script Generation Started")
+        reply = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": script},
+                {"role": "user", "content": content},
+            ]
+        )
+        print(reply.choices[0].message)
+
+        #Cleanup of the response 
+        #if 'choices' not in reply:
+            #logging.error("Script Generation Failed: 'choices' not in reply")
+            #return None
+
+        response = reply.choices[0].message.content # type: ignore
+        response = response.replace("\n\n","\n")
+        response = response.split("\n")
+        logging.info("Script Generation Finished")
+
+        return response
+    except Exception as e:
+        logging.error(f"Error occurred in chat_gen: {e}")
+        return None
 
 #Creates the script file
 def create_script(text, speaker, pos):
