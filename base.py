@@ -48,9 +48,10 @@ def get_models_list(path: str = "./"):
         print(f"Request failed: {e}")
 
 
-async def make_tts_request(session, character: str, phrase: str) -> str:
+async def make_tts_request(character: str, phrase: str) -> str:
     """Asynchronous request for speech synthesis."""
     try:
+        session = aiohttp.ClientSession()
         print("Making request...")
         async with session.post(
             url="https://api.fakeyou.com/tts/inference",
@@ -72,6 +73,10 @@ async def make_tts_request(session, character: str, phrase: str) -> str:
         print(f"Request failed: {e}")
     return None
 
+#call instead of make_tts_request
+
+def make_tts_request_not_async(character: str, phrase: str) -> str:
+    return asyncio.run(make_tts_request(character, phrase))
 
 async def poll_tts_status(session, inference_job_token: str, delay: float = 2, max_attempts: int = 50) -> str:
     """Asynchronous survey of the status of a request for speech synthesis and obtaining a link to an audio file."""
@@ -118,7 +123,7 @@ async def fetch_and_save_audio(session, character: str, phrase: str, output_path
             output_path_audio = os.path.join(output_path, filename)
             await download_audio(session, audio_url, output_path_audio)
 
-
+            
 #Set up the base prompt
 base_prompt = """
     You are to create scripts. 
@@ -255,7 +260,7 @@ def run():
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
 
-                    futures.append(executor.submit(speaker, text, voice_id, pos))
+                    futures.append(executor.submit(make_tts_request_not_async, text, voice_id))
 
         wait(futures)
 
