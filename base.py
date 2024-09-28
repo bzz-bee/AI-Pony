@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from time import sleep
 import soundfile as sf
 import wave
-import cookies
 import logging
 import random
 import requests
@@ -10,17 +9,26 @@ import aiohttp
 import asyncio
 import uuid
 import os
-import json
+import fakeyou
 from openai import OpenAI
 from openai import Client
 client = OpenAI(
 api_key = ""
 )
 
+
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
-#set up voices (voices.py)
+#set up fakeyou
+fy = fakeyou.FakeYou()
+try:
+  fy.login(username="", password="S")
+except fakeyou.exception.InvalidCredentials:
+  print("Login failed")
+  exit()
+print("Logged in")
+
 
 tokens = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
           "Applejack": "weight_a24e7sx6qgqpwamjsff3b3vef",
@@ -33,12 +41,10 @@ tokens = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
 headers = {
     "content-type": "application/json",
     "credentials": "include",
-    "cookie": f"session=eyJhbGciOiJIUzI1NiJ9.eyJzZXNzaW9uX3Rva2VuIjoic2Vzc2lvbl8xMDM5ODQ1azkweXpjcjF6c3ZiMDVjNzIiLCJ1c2VyX3Rva2VuIjoidXNlcl9lODk4N3prMGNqN2QzIiwidmVyc2lvbiI6IjMifQ.IjjKTj1Qv3RTRSgyVqHP5ktyHzIgrTw0S6AUcgcjBTo"
+    "cookie": f"session="
 }
 
-
 def get_models_list(path: str = "./"):
-    """Request for a list of models and save it in path/models_list.txt"""
     try:
         response = requests.get("https://api.fakeyou.com/tts/list")
         response.raise_for_status()
@@ -49,16 +55,15 @@ def get_models_list(path: str = "./"):
 
 
 async def make_tts_request(character: str, phrase: str) -> str:
-    """Asynchronous request for speech synthesis."""
     try:
         session = aiohttp.ClientSession()
         print("Making request...")
         async with session.post(
-            url="https://api.fakeyou.com/tts/inference",
+            url="https://api.fakeyou.com/tts/inference", 
             json={
                 "tts_model_token": tokens.get(character.lower()),
                 "uuid_idempotency_token": str(uuid.uuid4()),
-                "inference_text": phrase
+                "inference_text": phrase,
             },
             headers=headers
         ) as response:
@@ -73,13 +78,32 @@ async def make_tts_request(character: str, phrase: str) -> str:
         print(f"Request failed: {e}")
     return None
 
-#call instead of make_tts_request
+# call instead of make_tts_request
+def make_tts_request_no_async(character: str, phrase: str) -> str:
+    try:
+        print("Making request...")
+        response = requests.post(
+            url="https://api.fakeyou.com/tts/inference", 
+            json={
+                "tts_model_token": tokens.get(character.lower()),
+                "uuid_idempotency_token": str(uuid.uuid4()),
+                "inference_text": phrase,
+            },
+            headers=headers
+        )
+        response.raise_for_status()
+        job_token = response.json().get("inference_job_token")
+        if job_token:
+            print(f"Job token: {job_token}")
+            return job_token
+        else:
+            print("Error: No job token in response.")
+    except requests.HTTPError as e:
+        print(f"Request failed: {e}")
+    return None
 
-def make_tts_request_not_async(character: str, phrase: str) -> str:
-    return asyncio.run(make_tts_request(character, phrase))
-
+# poll tts status
 async def poll_tts_status(session, inference_job_token: str, delay: float = 2, max_attempts: int = 50) -> str:
-    """Asynchronous survey of the status of a request for speech synthesis and obtaining a link to an audio file."""
     try:
         print("Polling request...")
         base_url = "https://storage.googleapis.com/vocodes-public"
@@ -101,9 +125,8 @@ async def poll_tts_status(session, inference_job_token: str, delay: float = 2, m
         print(f"Polling failed: {e}")
     return None
 
-
+# download audio
 async def download_audio(session, url: str, output_path: str):
-    """Asynchronous download of an audio file by url"""
     try:
         async with session.get(url) as response:
             response.raise_for_status()
@@ -113,9 +136,8 @@ async def download_audio(session, url: str, output_path: str):
     except aiohttp.ClientError as e:
         print(f"Download failed: {e}")
 
-
+# fetch and save audio
 async def fetch_and_save_audio(session, character: str, phrase: str, output_path: str, filename: str):
-    """Asynchronous receipt and downloading of a file"""
     job_token = await make_tts_request(session, character, phrase)
     if job_token:
         audio_url = await poll_tts_status(session, job_token)
@@ -129,11 +151,10 @@ base_prompt = """
     You are to create scripts. 
     You will be giving the topic and who to act like. 
     Make sure you are in character.
-    You are the act like the person you are given. 
-    You dont need actions just what they say.
+    You are to act like the character you are given. 
     Dont do any actions.
-    Make sure the script is over 10 lines long, but under 15.
-    Format is: person: "what they say" 
+    The script must be over 10 lines long, but under 15.
+    Format is: character: "what they say" 
     Keep everything dumb and stupid.
 """
 
@@ -260,7 +281,7 @@ def run():
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
 
-                    futures.append(executor.submit(make_tts_request_not_async, text, voice_id))
+                    futures.append(executor.submit(make_tts_request_no_async, text, voice_id))
 
         wait(futures)
 
