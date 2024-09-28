@@ -2,8 +2,8 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from time import sleep
 import soundfile as sf
 import wave, logging, random, os, fakeyou, requests, json
-from .objects import *
-from .exception import *
+from objects import *
+from exception import *
 from openai import OpenAI
 from openai import Client
 client = OpenAI(
@@ -339,7 +339,7 @@ def run():
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
 
-                    futures.append(executor.submit(make_tts_job, text, voice_id))
+                    futures.append(executor.submit(FakeYou.make_tts_job, text, voice_id))
 
         wait(futures)
 
