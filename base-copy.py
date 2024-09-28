@@ -15,7 +15,7 @@ api_key = ""
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
 #set up fakeyou
-tokens = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
+token_list = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
           "Applejack": "weight_a24e7sx6qgqpwamjsff3b3vef",
           "Pinkie Pie": "weight_xzdr5a4cqhakdkshc96r32nv3",
           "Rarity": "weight_4j661zfzd3wm7sh3ks7eghx3w",
@@ -32,7 +32,6 @@ base_prompt = """
     You dont need actions just what they say.
     Dont do any actions.
     Make sure the script is over 10 lines long, but under 15.
-    Format is: person: "what they say" 
     Keep everything dumb and stupid.
 """
 
@@ -161,12 +160,12 @@ def run():
         futures = []
         with ThreadPoolExecutor() as executor:
             for line in script:
-                if line.split(":")[0] in tokens.keys():
-                    voice_id = tokens[line.split(":")[0]].strip()
+                if line.split(":")[0] in token_list.keys():
+                    ttsModeltoken = token_list[line.split(":")[0]].strip()
                     text = line.split(":")[1].strip()
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
-                    futures.append(executor.submit(FakeYou.make_tts_job, fy, text, tokens))
+                    futures.append(executor.submit(FakeYou.make_tts_job, ttsModelToken, text))
 
         wait(futures)
 
