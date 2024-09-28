@@ -14,13 +14,6 @@ api_key = ""
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
 #set up fakeyou
-fy = fakeyou.FakeYou()
-try:
-  fy.login(username="", password="")
-except fakeyou.exception.InvalidCredentials:
-  print("Login failed")
-  exit()
-print("Logged in")
 
 tokens = {"Rainbow Dash": "weight_wd1zz2z8av48j9k7z3dtkg58j",
           "Applejack": "weight_a24e7sx6qgqpwamjsff3b3vef",
