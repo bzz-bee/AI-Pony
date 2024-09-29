@@ -166,7 +166,8 @@ def run():
                     pos = script.index(line)
                     Fy = FakeYou(ttsModelToken)
                     job = FakeYou.make_tts_job(Fy, text, ttsModelToken)
-                    futures.append(executor.submit(job))
+                    poll = FakeYou.tts_poll(Fy, job)
+                    futures.append(executor.submit(job, poll))
 
         wait(futures)
 
