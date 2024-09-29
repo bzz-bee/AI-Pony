@@ -1,7 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ProcessPoolExecutor, wait
 from time import sleep
 import soundfile as sf
-import wave, logging, random, os, fakeyou, requests, json
+import wave, logging, random, os, fakeyou, requests, time, json
 from fakeyou import FakeYou
 from objects import *
 from exception import *
@@ -69,6 +69,36 @@ def chat_gen(script, content):
         logging.error(f"Error occurred in chat_gen: {e}")
         return None
 
+#Create the voice using fakeyou.py
+def gen_voice(text, ttsModelToken, pos):
+    try:
+        logging.info("Voice Request Started")
+        for _ in range(10):
+            Fy = FakeYou(ttsModelToken)
+            job = FakeYou.make_tts_job(Fy, text, ttsModelToken)
+            #ijt is stored in job
+            logging.info("Voice Request Finished")
+            for t in range(50):
+                sleep(10)
+                url = FakeYou.tts_poll(Fy, job)
+                #url is stored in the wav in the poll?
+                #how to get url?
+                logging.info("Audio Download Started")
+                output = requests.get(url).json()
+                if output['path'] != None:
+                    r = requests.get(output["path"], allow_redirects=True)
+                    file_path = f"speech{pos}.wav"
+                    with open(file_path, "wb") as f:
+                            f.write(r.content)
+                    return pos, file_path
+        logging.error("Download Failed: Unable to download audio after 50 attempts")
+    except Exception as e:
+        logging.error(f"Error occurred in gen_voice: {e}")
+        return None, None
+    finally:
+        logging.info("Audio Download Finished")
+
+
 #Creates the script file
 def create_script(text, speaker, pos):
     try:
@@ -81,6 +111,8 @@ def create_script(text, speaker, pos):
         logging.error(f"File speech{pos}.wav not found.")
     except Exception as e:
         logging.error(f"An unexpected error occurred while creating script: {e}")
+        
+        
 
 #Merges the audio files  
 def merge_wav_files(file_list, output_filename):
@@ -132,6 +164,7 @@ def cleanup():
     except Exception as e:
         logging.error(f"An unexpected error occurred during cleanup: {e}")
 
+
 #Main function
 def run():
     try:
@@ -149,7 +182,7 @@ def run():
         
         fy = fakeyou.FakeYou()
         try:
-            fy.login(username="", password="S")
+            fy.login(username="", password="")
         except fakeyou.exception.InvalidCredentials:
             print("Login failed")
             exit()
@@ -157,18 +190,17 @@ def run():
 
         
         futures = []
-        with ThreadPoolExecutor() as executor:
+        with ProcessPoolExecutor() as executor:
             for line in script:
                 if line.split(":")[0] in token_list.keys():
                     ttsModelToken = token_list[line.split(":")[0]].strip()
                     text = line.split(":")[1].strip()
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
-                    Fy = FakeYou(ttsModelToken)
-                    job = FakeYou.make_tts_job(Fy, text, ttsModelToken)
-                    poll = FakeYou.tts_poll(Fy, job)
-                    futures.append(executor.submit(job, poll))
+                    
+                    futures.append(executor.submit(gen_voice, text, ttsModelToken, pos,))
 
+        
         wait(futures)
 
         for future in futures:
