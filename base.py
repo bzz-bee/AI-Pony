@@ -8,7 +8,8 @@ from exception import *
 from openai import OpenAI
 from openai import Client
 client = OpenAI(
-api_key = "")
+api_key = ""
+)
 
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
@@ -79,11 +80,11 @@ def gen_voice(text, ttsModelToken, pos):
             #ijt is stored in job
             logging.info("Voice Request Finished")
             for t in range(50):
-                sleep(10)
+                sleep(5)
                 url = FakeYou.tts_poll(Fy, job)
-                #url is stored in the wav in the poll?
-                #how to get url?
                 logging.info("Audio Download Started")
+                for t in range(50):
+                    sleep(5)
                 output = requests.get(url).json()
                 if output['path'] != None:
                     r = requests.get(output["path"], allow_redirects=True)
@@ -91,6 +92,8 @@ def gen_voice(text, ttsModelToken, pos):
                     with open(file_path, "wb") as f:
                             f.write(r.content)
                     return pos, file_path
+                for t in range(50):
+                    sleep(5)
         logging.error("Download Failed: Unable to download audio after 50 attempts")
     except Exception as e:
         logging.error(f"Error occurred in gen_voice: {e}")
