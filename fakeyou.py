@@ -1,6 +1,4 @@
-#from charset_normalizer import from_path
-from charset_normalizer import from_bytes
-import requests, json,logging,re
+import requests,json,logging,re
 from uuid import uuid4
 from objects import *
 from exception import *
@@ -62,8 +60,7 @@ class FakeYou():
 			#ip ban !
 			logging.critical("IP IS BANNED (caused by login request)")
 			raise TooManyRequests()
-			
-			
+
 	def list_voices(self,size:int=0):
 		#this function will list every single voice that can be used
 		logging.debug("fetching voice models")
@@ -90,7 +87,6 @@ class FakeYou():
 		handler=self.session.get(self.baseurl+"category/list/tts")
 		logging.debug("Categories fetched!")
 		
-			
 		if handler.status_code==429:
 			#ip ban
 			logging.error("Your ip is banned");raise TooManyRequests()
@@ -108,8 +104,6 @@ class FakeYou():
 		
 		found={"models":[]}
 		#this var will be parsed as list_voice object
-		
-		
 			
 		for tokens,vjson in zip(voices.categoryTokens,voices.json):
 			#we get tokens to filter it all using tokens
@@ -120,8 +114,6 @@ class FakeYou():
 					found["models"].append(vjson)
 		
 		return list_voice(json=found,size=0)
-	
-	#set up fakeyou
 
 	def make_tts_job(self,text:str,ttsModelToken:str):
 		payload={"uuid_idempotency_token":str(uuid4()),
@@ -135,7 +127,6 @@ class FakeYou():
 			raise RequestError("check token and text, or contact the developer IG:@thedemonicat")
 		elif handler.status_code==429:
 			raise TooManyRequests()
-		
 	
 	def tts_poll(self,ijt:str):
 		while True:
@@ -147,8 +138,7 @@ class FakeYou():
 				if hjson["state"]["maybe_public_bucket_wav_audio_path"]:
 					base_url = "https://storage.googleapis.com/vocodes-public"
 					wav_link = base_url + hjson["state"]["maybe_public_bucket_wav_audio_path"]
-					output_bytes = self.session.get(f"{wav_link}").content
-					output = (from_bytes(output_bytes).best())
+					output_bytes = self.session.get(f"{wav_link}")
 					return output
 
 				#wavo=wav(hjson)
@@ -170,8 +160,6 @@ class FakeYou():
 						#raise PathNullError()
 			elif handler.status_code==429:
 				raise TooManyRequests()
-	
-	
 
 	def say(self,text:str,ttsModelToken:str):
 		
@@ -218,8 +206,6 @@ class FakeYou():
 			
 			if profile_handler.status_code==429 or w2l_models.status_code==429:
 				raise TooManyRequests()
-			
-			
 			else:
 				return profileo(
 				profile_json=profile_handler.json(),
