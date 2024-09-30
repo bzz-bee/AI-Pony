@@ -1,12 +1,11 @@
 from concurrent.futures import ProcessPoolExecutor, wait
+import wave, logging, random, os, fakeyou, requests, prompts
 from time import sleep
 import soundfile as sf
-import wave, logging, random, os, fakeyou, requests, time, json
 from fakeyou import FakeYou
 from objects import *
 from exception import *
 from openai import OpenAI
-from openai import Client
 client = OpenAI(
 api_key = ""
 )
@@ -24,23 +23,15 @@ token_list = {"Rainbow Dash": "weight_21arwhqhkg5d0nbe5ex7yj6br",
             
 #Instructions for ChatGPT
 base_prompt = """
-    You are to create scripts. 
-    You will be giving the topic and who to act like. 
+    You are to create scripts based on a topic.
     Make sure you are in character.
-    You are the act like the person you are given. 
-    You dont need actions just what they say.
-    Dont do any actions.
+    You are to act like the character you are given. 
+    Do not do any actions, only speak.
     The script must be over 10 lines long, but under 15. 
-    Keep everything dumb and stupid.
+    Make the conversation dumb and funny.
 """
-
-#Set up the topics
-prompts = [
-    "Rainbow Dash, Applejack, Rainbow Dash says Undertale is gay",
-    "Rainbow Dash, Applejack, Applejack says she hates apples",
-    "Rainbow Dash, Applejack, Applejack and Rainbow Dash are fighting over which Linux distro is best",
-    "Rainbow Dash, Applejack, Rainbow Dash says she loves Applejack",
-]
+# prompts in prompts.py
+p = prompts.prompts
 
 #Creates the script using the OpenAI API
 def chat_gen(script, content):
@@ -54,12 +45,6 @@ def chat_gen(script, content):
             ]
         )
         print(reply.choices[0].message)
-
-        #Cleanup of the response 
-        #if 'choices' not in reply:
-            #logging.error("Script Generation Failed: 'choices' not in reply")
-            #return None
-
         response = reply.choices[0].message.content # type: ignore
         response = response.replace("\n\n","\n")
         response = response.split("\n")
@@ -79,28 +64,25 @@ def gen_voice(text, ttsModelToken, pos):
             job = FakeYou.make_tts_job(Fy, text, ttsModelToken)
             #ijt is stored in job
             logging.info("Voice Request Finished")
-            for t in range(50):
-                sleep(5)
-                url = FakeYou.tts_poll(Fy, job)
-                logging.info("Audio Download Started")
-                for t in range(50):
-                    sleep(5)
-                output = requests.get(url).json()
-                if output['path'] != None:
-                    r = requests.get(output["path"], allow_redirects=True)
-                    file_path = f"speech{pos}.wav"
-                    with open(file_path, "wb") as f:
-                            f.write(r.content)
-                    return pos, file_path
-                for t in range(50):
-                    sleep(5)
+            #for t in range(50):
+                #sleep(5)
+            output = FakeYou.tts_poll(Fy, job)
+            logging.info("Audio Download Started")
+            #for t in range(50):
+                #sleep(5)
+            if output['path'] != None: #'NONETYPE' OBJECT IS NOT SUBSCRIPTABLE
+                r = requests.get(output["path"], allow_redirects=True)
+                file_path = f"speech{pos}.wav"
+                with open(file_path, "wb") as f:
+                        f.write(r.content)
+                return pos, file_path
+
         logging.error("Download Failed: Unable to download audio after 50 attempts")
     except Exception as e:
         logging.error(f"Error occurred in gen_voice: {e}")
         return None, None
     finally:
         logging.info("Audio Download Finished")
-
 
 #Creates the script file
 def create_script(text, speaker, pos):
@@ -114,8 +96,6 @@ def create_script(text, speaker, pos):
         logging.error(f"File speech{pos}.wav not found.")
     except Exception as e:
         logging.error(f"An unexpected error occurred while creating script: {e}")
-        
-        
 
 #Merges the audio files  
 def merge_wav_files(file_list, output_filename):
@@ -167,7 +147,6 @@ def cleanup():
     except Exception as e:
         logging.error(f"An unexpected error occurred during cleanup: {e}")
 
-
 #Main function
 def run():
     try:
@@ -176,7 +155,7 @@ def run():
         cleanup()
 
         #Chooses a random topic and creates the script
-        rand_prompt = random.choice(prompts)
+        rand_prompt = random.choice(p)
         script = chat_gen(base_prompt,rand_prompt)
 
         if script is None:
@@ -193,15 +172,14 @@ def run():
 
         
         futures = []
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(3) as executor:
             for line in script:
                 if line.split(":")[0] in token_list.keys():
                     ttsModelToken = token_list[line.split(":")[0]].strip()
                     text = line.split(":")[1].strip()
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
-                    
-                    futures.append(executor.submit(gen_voice, text, ttsModelToken, pos,))
+                    futures.append(executor.submit(gen_voice, text, ttsModelToken, pos))
 
         
         wait(futures)
