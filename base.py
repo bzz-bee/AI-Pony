@@ -13,7 +13,8 @@ api_key = ""
 #Settup up logging
 logging.basicConfig(filename='test.log', encoding='utf-8', level=logging.DEBUG)
 
-#set up fakeyou
+#Add more tokens by copy-pasting this part of the url of the voice on FakeYou website
+#No voice for Twilight Spakle yet. The impersonator does not sound like her.
 token_list = {"Rainbow Dash": "weight_21arwhqhkg5d0nbe5ex7yj6br",
           "Applejack": "weight_tv7k02rkycj4jta9hqttm0s4r",
           "Pinkie Pie": "weight_eejesc1m4pyn8vb4bc08dqnkj",
@@ -30,7 +31,7 @@ base_prompt = """
     The script must be over 10 lines long, but under 15. 
     Make the conversation dumb and funny.
 """
-# prompts in prompts.py
+#prompts in prompts.py
 p = prompts.prompts
 
 #Creates the script using the OpenAI API
@@ -78,7 +79,7 @@ def gen_voice(text, ttsModelToken, pos):
                             return pos, file_path
                         for t in range(50):
                             sleep(5)
-
+#The sleeping might be making the process takes awhile.
         logging.error("Download Failed: Unable to download audio after 50 attempts")
     except Exception as e:
         logging.error(f"Error occurred in gen_voice: {e}")
@@ -155,15 +156,13 @@ def run():
         logging.info("Program Started")
         #Cleans up the files
         cleanup()
-
         #Chooses a random topic and creates the script
         rand_prompt = random.choice(p)
         script = chat_gen(base_prompt,rand_prompt)
-
         if script is None:
             logging.error("Script generation failed")
             return
-        
+        #Login to FakeYou
         fy = fakeyou.FakeYou()
         try:
             fy.login(username="", password="")
@@ -172,9 +171,8 @@ def run():
             exit()
         print("Logged in")
 
-        
         futures = []
-        with ProcessPoolExecutor(3) as executor:
+        with ProcessPoolExecutor(1) as executor:
             for line in script:
                 if line.split(":")[0] in token_list.keys():
                     ttsModelToken = token_list[line.split(":")[0]].strip()
@@ -182,10 +180,8 @@ def run():
                     speaker = line.split(":")[0].strip()
                     pos = script.index(line)
                     futures.append(executor.submit(gen_voice, text, ttsModelToken, pos))
-
         
         wait(futures)
-
         for future in futures:
             pos, file_path = future.result()
             if file_path is not None:
