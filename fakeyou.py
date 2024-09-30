@@ -1,7 +1,9 @@
-import requests,json,time,logging,re
+#from charset_normalizer import from_path
+from charset_normalizer import from_bytes
+import requests, json,logging,re
 from uuid import uuid4
-from .objects import *
-from .exception import *
+from objects import *
+from exception import *
 """
 Hey devs, i know you're looking throug the code
 its messy, i'll comment it later.
@@ -133,8 +135,7 @@ class FakeYou():
 			raise RequestError("check token and text, or contact the developer IG:@thedemonicat")
 		elif handler.status_code==429:
 			raise TooManyRequests()
-		for t in range(50):
-			sleep(5)
+		
 	
 	def tts_poll(self,ijt:str):
 		while True:
@@ -146,8 +147,9 @@ class FakeYou():
 				if hjson["state"]["maybe_public_bucket_wav_audio_path"]:
 					base_url = "https://storage.googleapis.com/vocodes-public"
 					wav_link = base_url + hjson["state"]["maybe_public_bucket_wav_audio_path"]
-					print(f"Audio file ready: {wav_link}")
-					return wav_link
+					output_bytes = self.session.get(f"{wav_link}").content
+					output = (from_bytes(output_bytes).best())
+					return output
 
 				#wavo=wav(hjson)
 				#if wavo.status=="started":
