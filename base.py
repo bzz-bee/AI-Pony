@@ -63,23 +63,17 @@ def gen_voice(text, ttsModelToken, pos):
         for _ in range(10):
             Fy = FakeYou(ttsModelToken)
             for t in range(50):
-                sleep(5)
+                sleep(30)
                 job = FakeYou.make_tts_job(Fy, text, ttsModelToken)
                 logging.info("Voice Request Finished")
-                for t in range(50):
-                    sleep(5)
-                    output = FakeYou.tts_poll(Fy, job)
-                    logging.info("Audio Download Started")
-                    for t in range(50):
-                        sleep(5)
-                        if output != None:
-                            file_path = f"speech{pos}.wav"
-                            with open(file_path, "wb") as f:
-                                    f.write(output.content)
-                            return pos, file_path
-                        for t in range(50):
-                            sleep(5)
-#The sleeping might be making the process takes awhile.
+                output = FakeYou.tts_poll(Fy, job)
+                logging.info("Audio Download Started")
+                if output != None:
+                    file_path = f"speech{pos}.wav"
+                    with open(file_path, "wb") as f:
+                        f.write(output.content)
+                    return pos, file_path
+                        
         logging.error("Download Failed: Unable to download audio after 50 attempts")
     except Exception as e:
         logging.error(f"Error occurred in gen_voice: {e}")
@@ -172,7 +166,7 @@ def run():
         print("Logged in")
 
         futures = []
-        with ProcessPoolExecutor(1) as executor:
+        with ProcessPoolExecutor(3) as executor:
             for line in script:
                 if line.split(":")[0] in token_list.keys():
                     ttsModelToken = token_list[line.split(":")[0]].strip()
