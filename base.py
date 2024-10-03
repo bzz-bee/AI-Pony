@@ -1,5 +1,5 @@
-from concurrent.futures import ProcessPoolExecutor, wait
-import wave, logging, random, os, fakeyou, requests, prompts
+from concurrent.futures import ThreadPoolExecutor, wait
+import wave, logging, random, os, fakeyou, prompts
 from time import sleep
 import soundfile as sf
 from fakeyou import FakeYou
