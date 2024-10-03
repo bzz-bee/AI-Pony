@@ -132,7 +132,6 @@ class FakeYou():
 		while True:
 			handler=self.session.get(url=self.baseurl+f"tts/job/{ijt}")
 			if handler.status_code==200:
-				# handler = response
 				#Replaced wavo with this:
 				hjson=handler.json()
 				if hjson["state"]["maybe_public_bucket_wav_audio_path"]:
@@ -140,24 +139,6 @@ class FakeYou():
 					wav_link = base_url + hjson["state"]["maybe_public_bucket_wav_audio_path"]
 					output_bytes = self.session.get(f"{wav_link}")
 					return output
-
-				#wavo=wav(hjson)
-				#if wavo.status=="started":
-					#continue
-				#elif "pending" == wavo.status:
-					#continue
-				#elif "attempt_failed" == wavo.status:
-					#raise Failed()
-				#elif "dead" == wavo.status:
-					#raise Dead()
-				#elif "complete_success" == wavo.status:
-					#if wavo.link!=None:
-						#content=self.session.get(wavo.link).content
-						#del wavo
-						#for RAM
-						#return wav(hjson,content)
-					#else:
-						#raise PathNullError()
 			elif handler.status_code==429:
 				raise TooManyRequests()
 
