@@ -137,7 +137,7 @@ class FakeYou():
 				if hjson["state"]["maybe_public_bucket_wav_audio_path"]:
 					base_url = "https://storage.googleapis.com/vocodes-public"
 					wav_link = base_url + hjson["state"]["maybe_public_bucket_wav_audio_path"]
-					output_bytes = self.session.get(f"{wav_link}")
+					output = self.session.get(f"{wav_link}")
 					return output
 			elif handler.status_code==429:
 				raise TooManyRequests()
